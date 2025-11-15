@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль</title>
+    <link rel="stylesheet" href="/static/auth/css/styles.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-content">
+            <div class="nav-links">
+                <a href="/auth/profile/" class="nav-link">Профиль</a>
+            </div>
+            <div class="nav-links">
+                <span id="user-email" style="color: var(--text-secondary); font-size: 14px;"></span>
+                <button onclick="handleLogout()" class="btn-link" style="margin-left: 20px;">Выйти</button>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="profile-container">
+        <div class="profile-card">
+            <div class="profile-header">
+                <h1>Мой профиль</h1>
+                <button onclick="toggleEditMode()" class="btn btn-secondary" id="edit-btn">Редактировать</button>
+            </div>
+            
+            <div id="alert-container"></div>
+            
+            <form id="profile-form">
+                <div class="profile-info">
+                    <div class="info-row">
+                        <div class="info-label">Email:</div>
+                        <div class="info-value" id="email-display"></div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">Имя:</div>
+                        <div class="info-value">
+                            <span id="first_name-display"></span>
+                            <input type="text" id="first_name-input" class="form-group" style="display: none; margin-top: 8px;" placeholder="Имя">
+                        </div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">Фамилия:</div>
+                        <div class="info-value">
+                            <span id="last_name-display"></span>
+                            <input type="text" id="last_name-input" class="form-group" style="display: none; margin-top: 8px;" placeholder="Фамилия">
+                        </div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">Отчество:</div>
+                        <div class="info-value">
+                            <span id="middle_name-display"></span>
+                            <input type="text" id="middle_name-input" class="form-group" style="display: none; margin-top: 8px;" placeholder="Отчество">
+                        </div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">Дата регистрации:</div>
+                        <div class="info-value" id="date_joined-display"></div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">Последний вход:</div>
+                        <div class="info-value" id="last_login-display"></div>
+                    </div>
+                </div>
+                
+                <div class="profile-actions" id="edit-actions" style="display: none;">
+                    <button type="button" onclick="saveProfile()" class="btn btn-primary" id="save-btn">Сохранить</button>
+                    <button type="button" onclick="cancelEdit()" class="btn btn-secondary">Отмена</button>
+                </div>
+            </form>
+            
+            <div class="profile-actions">
+                <button onclick="handleDeleteAccount()" class="btn btn-danger">Удалить аккаунт</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/auth/js/api.js"></script>
+    <script>
+        // Redirect if not authenticated
+        if (!AuthAPI.isAuthenticated()) {
+            window.location.href = '/auth/login/';
+        }
+        
+        let isEditMode = false;
+        let originalData = {};
+        
+        const alertContainer = document.getElementById('alert-container');
+        
+        function showAlert(message, type = 'error') {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type}">
+                    <span>${message}</span>
+                </div>
+            `;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'Никогда';
+            const date = new Date(dateString);
+            return date.toLocaleString('ru-RU', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function displayProfile(user) {
+            document.getElementById('email-display').textContent = user.email || 'Не указан';
+            document.getElementById('user-email').textContent = user.email || '';
+            
+            const profile = user.profile || {};
+            document.getElementById('first_name-display').textContent = profile.first_name || 'Не указано';
+            document.getElementById('last_name-display').textContent = profile.last_name || 'Не указано';
+            document.getElementById('middle_name-display').textContent = profile.middle_name || 'Не указано';
+            
+            document.getElementById('date_joined-display').textContent = formatDate(user.date_joined);
+            document.getElementById('last_login-display').textContent = formatDate(user.last_login);
+            
+            // Store original data
+            originalData = {
+                first_name: profile.first_name || '',
+                last_name: profile.last_name || '',
+                middle_name: profile.middle_name || '',
+            };
+        }
+        
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            
+            const displays = ['first_name', 'last_name', 'middle_name'];
+            displays.forEach(field => {
+                const displayEl = document.getElementById(`${field}-display`);
+                const inputEl = document.getElementById(`${field}-input`);
+                
+                if (isEditMode) {
+                    displayEl.style.display = 'none';
+                    inputEl.style.display = 'block';
+                    inputEl.value = originalData[field] || '';
+                } else {
+                    displayEl.style.display = 'inline';
+                    inputEl.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('edit-actions').style.display = isEditMode ? 'flex' : 'none';
+            document.getElementById('edit-btn').textContent = isEditMode ? 'Отмена' : 'Редактировать';
+        }
+        
+        function cancelEdit() {
+            toggleEditMode();
+        }
+        
+        async function saveProfile() {
+            const saveBtn = document.getElementById('save-btn');
+            const profileData = {
+                first_name: document.getElementById('first_name-input').value.trim(),
+                last_name: document.getElementById('last_name-input').value.trim(),
+                middle_name: document.getElementById('middle_name-input').value.trim(),
+            };
+            
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner"></span> Сохранение...';
+            
+            const result = await AuthAPI.updateProfile(profileData);
+            
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Сохранить';
+            
+            if (result.success) {
+                // Update local storage
+                const user = AuthAPI.getUser();
+                if (user) {
+                    user.profile = {
+                        ...user.profile,
+                        ...profileData
+                    };
+                    localStorage.setItem('user', JSON.stringify(user));
+                }
+                
+                displayProfile(result.data);
+                toggleEditMode();
+                showAlert('Профиль успешно обновлен', 'success');
+            } else {
+                showAlert(result.error || 'Ошибка при обновлении профиля');
+            }
+        }
+        
+        async function handleLogout() {
+            if (confirm('Вы уверены, что хотите выйти?')) {
+                await AuthAPI.logout();
+                window.location.href = '/auth/login/';
+            }
+        }
+        
+        async function handleDeleteAccount() {
+            if (confirm('Вы уверены, что хотите удалить аккаунт? Это действие нельзя отменить.')) {
+                if (confirm('Это действие удалит ваш аккаунт. Продолжить?')) {
+                    const result = await AuthAPI.deleteAccount();
+                    if (result.success) {
+                        showAlert('Аккаунт успешно удален', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/auth/login/';
+                        }, 2000);
+                    } else {
+                        showAlert(result.error || 'Ошибка при удалении аккаунта');
+                    }
+                }
+            }
+        }
+        
+        // Load profile on page load
+        async function loadProfile() {
+            const result = await AuthAPI.getProfile();
+            if (result.success) {
+                displayProfile(result.data);
+                // Update localStorage
+                localStorage.setItem('user', JSON.stringify(result.data));
+            } else {
+                if (result.error.includes('401') || result.error.includes('Unauthorized')) {
+                    // Token expired
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/auth/login/';
+                } else {
+                    showAlert(result.error || 'Ошибка при загрузке профиля');
+                }
+            }
+        }
+        
+        // Initialize
+        const cachedUser = AuthAPI.getUser();
+        if (cachedUser) {
+            displayProfile(cachedUser);
+        }
+        
+        loadProfile();
+    </script>
+</body>
+</html>
+

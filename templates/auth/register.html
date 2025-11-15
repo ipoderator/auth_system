@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация</title>
+    <link rel="stylesheet" href="/static/auth/css/styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1>Регистрация</h1>
+                <p>Создайте новый аккаунт</p>
+            </div>
+            
+            <div id="alert-container"></div>
+            
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required autocomplete="email">
+                    <span class="error-message" id="email-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="first_name">Имя</label>
+                    <input type="text" id="first_name" name="first_name" autocomplete="given-name">
+                    <span class="error-message" id="first_name-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Фамилия</label>
+                    <input type="text" id="last_name" name="last_name" autocomplete="family-name">
+                    <span class="error-message" id="last_name-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="middle_name">Отчество</label>
+                    <input type="text" id="middle_name" name="middle_name" autocomplete="additional-name">
+                    <span class="error-message" id="middle_name-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Пароль *</label>
+                    <input type="password" id="password" name="password" required autocomplete="new-password">
+                    <span class="error-message" id="password-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password_confirm">Подтверждение пароля *</label>
+                    <input type="password" id="password_confirm" name="password_confirm" required autocomplete="new-password">
+                    <span class="error-message" id="password_confirm-error"></span>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                    Зарегистрироваться
+                </button>
+            </form>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <p style="color: var(--text-secondary); font-size: 14px;">
+                    Уже есть аккаунт? 
+                    <a href="/auth/login/" class="btn-link">Войти</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/auth/js/api.js"></script>
+    <script>
+        // Redirect if already authenticated
+        if (AuthAPI.isAuthenticated()) {
+            window.location.href = '/auth/profile/';
+        }
+        
+        const form = document.getElementById('register-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const alertContainer = document.getElementById('alert-container');
+        
+        function showAlert(message, type = 'error') {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type}">
+                    <span>${message}</span>
+                </div>
+            `;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+        
+        function clearErrors() {
+            document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
+            document.querySelectorAll('.form-group input').forEach(el => el.classList.remove('error'));
+        }
+        
+        function setFieldError(fieldName, message) {
+            const field = document.getElementById(fieldName);
+            const errorEl = document.getElementById(`${fieldName}-error`);
+            if (field) field.classList.add('error');
+            if (errorEl) errorEl.textContent = message;
+        }
+        
+        function setErrors(errors) {
+            clearErrors();
+            Object.keys(errors).forEach(field => {
+                const errorMessages = Array.isArray(errors[field]) ? errors[field] : [errors[field]];
+                setFieldError(field, errorMessages[0]);
+            });
+        }
+        
+        // Password match validation
+        document.getElementById('password_confirm').addEventListener('blur', function() {
+            const password = document.getElementById('password').value;
+            const passwordConfirm = this.value;
+            
+            if (password && passwordConfirm && password !== passwordConfirm) {
+                setFieldError('password_confirm', 'Пароли не совпадают');
+            } else {
+                const errorEl = document.getElementById('password_confirm-error');
+                if (errorEl) errorEl.textContent = '';
+                const field = document.getElementById('password_confirm');
+                if (field) field.classList.remove('error');
+            }
+        });
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearErrors();
+            
+            const formData = {
+                email: document.getElementById('email').value.trim(),
+                first_name: document.getElementById('first_name').value.trim(),
+                last_name: document.getElementById('last_name').value.trim(),
+                middle_name: document.getElementById('middle_name').value.trim(),
+                password: document.getElementById('password').value,
+                password_confirm: document.getElementById('password_confirm').value,
+            };
+            
+            if (!formData.email || !formData.password || !formData.password_confirm) {
+                showAlert('Пожалуйста, заполните обязательные поля');
+                return;
+            }
+            
+            if (formData.password !== formData.password_confirm) {
+                setFieldError('password_confirm', 'Пароли не совпадают');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span> Регистрация...';
+            
+            const result = await AuthAPI.register(formData);
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Зарегистрироваться';
+            
+            if (result.success) {
+                showAlert('Регистрация успешна! Выполняется вход...', 'success');
+                // Auto login after registration
+                const loginResult = await AuthAPI.login(formData.email, formData.password);
+                if (loginResult.success) {
+                    setTimeout(() => {
+                        window.location.href = '/auth/profile/';
+                    }, 1000);
+                } else {
+                    setTimeout(() => {
+                        window.location.href = '/auth/login/';
+                    }, 1000);
+                }
+            } else {
+                // Check if we have field-level errors
+                if (result.errorData) {
+                    setErrors(result.errorData);
+                } else {
+                    // General error message
+                    if (result.error.toLowerCase().includes('email')) {
+                        setFieldError('email', 'Пользователь с таким email уже существует');
+                    } else if (result.error.toLowerCase().includes('password')) {
+                        setFieldError('password', result.error);
+                    } else {
+                        showAlert(result.error || 'Ошибка при регистрации');
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

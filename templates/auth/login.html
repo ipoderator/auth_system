@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в систему</title>
+    <link rel="stylesheet" href="/static/auth/css/styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1>Вход в систему</h1>
+                <p>Введите ваши учетные данные</p>
+            </div>
+            
+            <div id="alert-container"></div>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required autocomplete="email">
+                    <span class="error-message" id="email-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                    <span class="error-message" id="password-error"></span>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                    Войти
+                </button>
+            </form>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <p style="color: var(--text-secondary); font-size: 14px;">
+                    Нет аккаунта? 
+                    <a href="/auth/register/" class="btn-link">Зарегистрироваться</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/auth/js/api.js"></script>
+    <script>
+        // Redirect if already authenticated
+        if (AuthAPI.isAuthenticated()) {
+            window.location.href = '/auth/profile/';
+        }
+        
+        const form = document.getElementById('login-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const alertContainer = document.getElementById('alert-container');
+        
+        function showAlert(message, type = 'error') {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type}">
+                    <span>${message}</span>
+                </div>
+            `;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+        
+        function clearErrors() {
+            document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
+            document.querySelectorAll('.form-group input').forEach(el => el.classList.remove('error'));
+        }
+        
+        function setFieldError(fieldName, message) {
+            const field = document.getElementById(fieldName);
+            const errorEl = document.getElementById(`${fieldName}-error`);
+            if (field) field.classList.add('error');
+            if (errorEl) errorEl.textContent = message;
+        }
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearErrors();
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showAlert('Пожалуйста, заполните все поля');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span> Вход...';
+            
+            const result = await AuthAPI.login(email, password);
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Войти';
+            
+            if (result.success) {
+                showAlert('Успешный вход! Перенаправление...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/auth/profile/';
+                }, 1000);
+            } else {
+                if (result.error.includes('email') || result.error.includes('password')) {
+                    setFieldError('email', 'Неверный email или пароль');
+                    setFieldError('password', '');
+                } else {
+                    showAlert(result.error || 'Ошибка при входе');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
