@@ -18,4 +18,3 @@ router.register(r'user-roles', UserRoleViewSet, basename='user-role')
 urlpatterns = [
     path('', include(router.urls)),
 ]
-

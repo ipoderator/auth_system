@@ -10,4 +10,3 @@ router.register(r'reports', MockReportViewSet, basename='report')
 urlpatterns = [
     path('', include(router.urls)),
 ]
-
